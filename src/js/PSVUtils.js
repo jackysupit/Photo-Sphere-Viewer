@@ -142,28 +142,6 @@ PSVUtils.getXMPValue = function(data, attr) {
 };
 
 /**
- * Cross browser requestAnimationFrame
- * https://gist.github.com/julianshapiro/9497513
- */
-PSVUtils.requestAnimationFrame = function(callback) {
-  var timeLast = 0;
-
-  return (window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || function(callback) {
-      var timeCurrent = (new Date()).getTime(),
-        timeDelta;
-
-      /* Dynamically set delay on a per-tick basis to match 60fps. */
-      /* Technique by Erik Moller. MIT license: https://gist.github.com/paulirish/1579671 */
-      timeDelta = Math.max(0, 16 - (timeCurrent - timeLast));
-      timeLast = timeCurrent + timeDelta;
-
-      return setTimeout(function() {
-        callback(timeCurrent + timeDelta);
-      }, timeDelta);
-    }).call(window, callback);
-};
-
-/**
  * Detects whether fullscreen is enabled or not
  * @return (boolean) true if fullscreen is enabled, false otherwise
  */
@@ -228,6 +206,7 @@ PSVUtils.parsePosition = function(value) {
  * @param options (Object)
  *    - properties[{end, start}]
  *    - duration
+ *    - delay
  *    - easing
  *    - onTick(properties)
  * @returns (D.promise)
@@ -235,7 +214,10 @@ PSVUtils.parsePosition = function(value) {
 PSVUtils.animation = function(options) {
   var defer = D();
   var start = null;
-  var ease = PSVUtils.animation.easings[options.easing || 'linear'];
+
+  if (!options.easing || typeof options.easing == 'string') {
+    options.easing = PSVUtils.animation.easings[options.easing || 'linear'];
+  }
 
   function run(timestamp) {
     if (start === null) {
@@ -247,12 +229,12 @@ PSVUtils.animation = function(options) {
 
     if (progress < 1.0) {
       for (var name in options.properties) {
-        current[name] = options.properties[name].start + (options.properties[name].end - options.properties[name].start) * ease(progress);
+        current[name] = options.properties[name].start + (options.properties[name].end - options.properties[name].start) * options.easing(progress);
       }
 
       options.onTick(current, progress);
 
-      PSVUtils.requestAnimationFrame(run);
+      window.requestAnimationFrame(run);
     }
     else {
       for (var name in options.properties) {
@@ -265,7 +247,14 @@ PSVUtils.animation = function(options) {
     }
   }
 
-  PSVUtils.requestAnimationFrame(run);
+  if (options.delay) {
+    setTimeout(function() {
+      window.requestAnimationFrame(run);
+    }, options.delay);
+  }
+  else {
+    window.requestAnimationFrame(run);
+  }
 
   return defer.promise;
 };

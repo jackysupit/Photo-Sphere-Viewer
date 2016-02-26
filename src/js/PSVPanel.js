@@ -42,7 +42,7 @@ PSVPanel.prototype.create = function() {
 
   // Stop event bubling from panel
   if (this.psv.config.mousewheel) {
-    this.container.addEventListener(PSVUtils.mouseWheelEvent(), function(e) {
+    this.container.addEventListener(PhotoSphereViewer.SYSTEM.mouseWheelEvent, function(e) {
       e.stopPropagation();
     });
   }

@@ -21,7 +21,8 @@
   ],
   "dependencies": {
     "three.js": ">= 0.0.67",
-    "D.js": "~0.7.3"
+    "D.js": "~0.7.3",
+    "requestanimationframe": "https://gist.githubusercontent.com/iangilman/5824967/raw/d77d262fd08b4829e725d28d831138ff0acf49ad/requestanimationframe.js"
   },
   "keywords": [
     "photosphere",

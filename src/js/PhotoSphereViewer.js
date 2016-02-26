@@ -7,7 +7,11 @@ function PhotoSphereViewer(options) {
     return new PhotoSphereViewer(options);
   }
 
-  if (!PSVUtils.isWebGLSupported() && !PSVUtils.checkTHREE('CanvasRenderer', 'Projector')) {
+  if (!PhotoSphereViewer.SYSTEM.loaded) {
+    PhotoSphereViewer.loadSystem();
+  }
+
+  if (!PhotoSphereViewer.SYSTEM.isWebGLSupported && !PSVUtils.checkTHREE('CanvasRenderer', 'Projector')) {
     throw new PSVError('Missing Three.js components: CanvasRenderer, Projector. Get them from threejs-examples package.');
   }
 
@@ -100,7 +104,7 @@ function PhotoSphereViewer(options) {
   this.parent.appendChild(this.container);
 
   // is canvas supported?
-  if (!PSVUtils.isCanvasSupported()) {
+  if (!PhotoSphereViewer.SYSTEM.isCanvasSupported) {
     this.container.textContent = 'Canvas is not supported, update your browser!';
     throw new PSVError('Canvas is not supported.');
   }
@@ -126,6 +130,25 @@ PhotoSphereViewer.HalfPI = Math.PI / 2.0;
 PhotoSphereViewer.MOVE_THRESHOLD = 4;
 
 PhotoSphereViewer.ICONS = {};
+
+PhotoSphereViewer.SYSTEM = {
+  loaded: false,
+  isWebGLSupported: false,
+  isCanvasSupported: false,
+  maxTextureWidth: 0,
+  mouseWheelEvent: null,
+  fullscreenEvent: null
+};
+
+PhotoSphereViewer.loadSystem = function() {
+  var S = PhotoSphereViewer.SYSTEM;
+  S.loaded = true;
+  S.isWebGLSupported = PSVUtils.isWebGLSupported();
+  S.isCanvasSupported = PSVUtils.isCanvasSupported();
+  S.maxTextureWidth = PSVUtils.getMaxTextureWidth();
+  S.mouseWheelEvent = PSVUtils.mouseWheelEvent();
+  S.fullscreenEvent = PSVUtils.fullscreenEvent();
+};
 
 /**
  * PhotoSphereViewer defaults
@@ -190,7 +213,7 @@ PhotoSphereViewer.DEFAULTS = {
 PhotoSphereViewer.prototype.destroy = function() {
   // remove listeners
   window.removeEventListener('resize', this);
-  document.removeEventListener(PSVUtils.fullscreenEvent(), this);
+  document.removeEventListener(PhotoSphereViewer.SYSTEM.fullscreenEvent, this);
 
   if (this.config.mousemove) {
     this.hud.container.removeEventListener('mousedown', this);
@@ -202,7 +225,7 @@ PhotoSphereViewer.prototype.destroy = function() {
   }
 
   if (this.config.mousewheel) {
-    this.hud.container.removeEventListener(PSVUtils.mouseWheelEvent(), this);
+    this.hud.container.removeEventListener(PhotoSphereViewer.SYSTEM.mouseWheelEvent, this);
   }
 
   // destroy components
@@ -225,7 +248,6 @@ PhotoSphereViewer.prototype.destroy = function() {
     this.mesh.material.map = null;
     this.mesh.material.dispose();
     this.mesh.material = null;
-    this.mesh.dispose();
   }
 
   // remove container
@@ -276,7 +298,9 @@ PhotoSphereViewer.prototype._loadXMP = function() {
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4) {
       if (xhr.status === 200 || xhr.status === 201 || xhr.status === 202 || xhr.status === 0) {
-        self.loader.setProgress(100);
+        if (self.loader) {
+          self.loader.setProgress(100);
+        }
 
         var binary = xhr.responseText;
         var a = binary.indexOf('<x:xmpmeta'), b = binary.indexOf('</x:xmpmeta>');
@@ -305,12 +329,14 @@ PhotoSphereViewer.prototype._loadXMP = function() {
       }
     }
     else if (xhr.readyState === 3) {
-      self.loader.setProgress(progress + 10);
+      if (self.loader) {
+        self.loader.setProgress(progress + 10);
+      }
     }
   };
 
   xhr.onprogress = function(e) {
-    if (e.lengthComputable) {
+    if (e.lengthComputable && self.loader) {
       var new_progress = parseInt(e.loaded / e.total * 100);
       if (new_progress > progress) {
         progress = new_progress;
@@ -347,7 +373,9 @@ PhotoSphereViewer.prototype._loadTexture = function(pano_data) {
   }
 
   var onload = function(img) {
-    self.loader.setProgress(100);
+    if (self.loader) {
+      self.loader.setProgress(100);
+    }
 
     // Default XMP data
     if (!pano_data) {
@@ -363,8 +391,8 @@ PhotoSphereViewer.prototype._loadTexture = function(pano_data) {
 
     // Size limit for mobile compatibility
     var max_width = 4096;
-    if (PSVUtils.isWebGLSupported()) {
-      max_width = PSVUtils.getMaxTextureWidth();
+    if (PhotoSphereViewer.SYSTEM.isWebGLSupported) {
+      max_width = PhotoSphereViewer.SYSTEM.maxTextureWidth;
     }
 
     var new_width = Math.min(pano_data.full_width, max_width);
@@ -393,12 +421,14 @@ PhotoSphereViewer.prototype._loadTexture = function(pano_data) {
 
     var texture = new THREE.Texture(img);
     texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
 
     defer.resolve(texture);
   };
 
   var onprogress = function(e) {
-    if (e.lengthComputable) {
+    if (e.lengthComputable && self.loader) {
       var new_progress = parseInt(e.loaded / e.total * 100);
       if (new_progress > progress) {
         progress = new_progress;
@@ -420,7 +450,7 @@ PhotoSphereViewer.prototype._loadTexture = function(pano_data) {
 /**
  * Applies the texture to the scene
  * Creates the scene if needed
- * @param img (Canvas) The sphere texture
+ * @param texture (THREE.Texture) The sphere texture
  * @returns (D.promise)
  */
 PhotoSphereViewer.prototype._setTexture = function(texture) {
@@ -433,11 +463,6 @@ PhotoSphereViewer.prototype._setTexture = function(texture) {
   }
 
   this.mesh.material.map = texture;
-
-  this.loader.destroy();
-  this.loader = null;
-
-  this.container.classList.remove('loading');
 
   this.trigger('panorama-loaded');
 
@@ -456,7 +481,7 @@ PhotoSphereViewer.prototype._createScene = function() {
   this.raycaster = new THREE.Raycaster();
 
   // Renderer depends on whether WebGL is supported or not
-  this.renderer = PSVUtils.isWebGLSupported() ? new THREE.WebGLRenderer() : new THREE.CanvasRenderer();
+  this.renderer = PhotoSphereViewer.SYSTEM.isWebGLSupported ? new THREE.WebGLRenderer() : new THREE.CanvasRenderer();
   this.renderer.setSize(this.prop.size.width, this.prop.size.height);
 
   this.camera = new THREE.PerspectiveCamera(this.config.default_fov, this.prop.size.ratio, 1, 300);
@@ -519,6 +544,7 @@ PhotoSphereViewer.prototype._createScene = function() {
     this.passes.blur.renderToScreen = true;
 
     // values for minimal luminosity change
+    this.passes.blur.uniforms.fDensity.value = 0.0;
     this.passes.blur.uniforms.fWeight.value = 0.5;
     this.passes.blur.uniforms.fDecay.value = 0.5;
     this.passes.blur.uniforms.fExposure.value = 1.0;
@@ -538,7 +564,7 @@ PhotoSphereViewer.prototype._createScene = function() {
  */
 PhotoSphereViewer.prototype._bindEvents = function() {
   window.addEventListener('resize', this);
-  document.addEventListener(PSVUtils.fullscreenEvent(), this);
+  document.addEventListener(PhotoSphereViewer.SYSTEM.fullscreenEvent, this);
 
   // all interation events are binded to the HUD only
   if (this.config.mousemove) {
@@ -552,7 +578,7 @@ PhotoSphereViewer.prototype._bindEvents = function() {
   }
 
   if (this.config.mousewheel) {
-    this.hud.container.addEventListener(PSVUtils.mouseWheelEvent(), this);
+    this.hud.container.addEventListener(PhotoSphereViewer.SYSTEM.mouseWheelEvent, this);
   }
 };
 
@@ -570,8 +596,8 @@ PhotoSphereViewer.prototype.handleEvent = function(e) {
     case 'touchend':    this._onTouchEnd(e);    break;
     case 'mousemove':   this._onMouseMove(e);   break;
     case 'touchmove':   this._onTouchMove(e);   break;
-    case PSVUtils.fullscreenEvent():  this._fullscreenToggled();  break;
-    case PSVUtils.mouseWheelEvent():  this._onMouseWheel(e);      break;
+    case PhotoSphereViewer.SYSTEM.fullscreenEvent:  this._fullscreenToggled();  break;
+    case PhotoSphereViewer.SYSTEM.mouseWheelEvent:  this._onMouseWheel(e);      break;
     // @formatter:on
   }
 };
@@ -580,45 +606,63 @@ PhotoSphereViewer.prototype.handleEvent = function(e) {
  * Load a panorama file
  * Creates the scene in needed
  * @param path (String)
- * @param transition (boolean)
+ * @param position({latitude, longitude}, optional)
+ * @param transition (boolean, optional)
+ * @return (D.promise)
  */
-PhotoSphereViewer.prototype.setPanorama = function(path, transition) {
+PhotoSphereViewer.prototype.setPanorama = function(path, position, transition) {
+  if (typeof position == 'boolean') {
+    transition = position;
+    position = undefined;
+  }
+
   this.config.panorama = path;
 
-  this.container.classList.add('loading');
-
-  this.loader = new PSVLoader(this);
+  var self = this;
 
   if (!transition || !this.config.transition || !this.scene) {
-    this._loadXMP()
+    this.loader = new PSVLoader(this);
+
+    return this._loadXMP()
       .then(this._loadTexture.bind(this))
-      .then(this._setTexture.bind(this));
+      .then(this._setTexture.bind(this))
+      .then(function() {
+        if (self.loader) {
+          self.loader.destroy();
+          self.loader = null;
+        }
+        if (position) {
+          self.rotate(position.longitude, position.latitude);
+        }
+      });
   }
   else {
-    var self = this;
+    if (this.config.transition.loader) {
+      this.loader = new PSVLoader(this);
+    }
 
-    this._loadXMP()
+    return this._loadXMP()
       .then(this._loadTexture.bind(this))
-      .then(function(img) {
-        if (self.config.transition.blur) {
-          setTimeout(
-            self._blendTexture.bind(self, img),
-            self.config.transition.duration / 4
-          );
-          return self._transition();
+      .then(function(texture) {
+        if (self.loader) {
+          self.loader.destroy();
+          self.loader = null;
         }
-        else {
-          return self._blendTexture(img);
-        }
-      })
-      .then(function() {
-        self.loader.destroy();
-        self.loader = null;
+
+        return self._transition(texture, position);
       });
   }
 };
 
-PhotoSphereViewer.prototype._blendTexture = function(texture) {
+/**
+ * Perform transition betwwen current and new texture
+ * @param texture (THREE.Texture)
+ * @returns (D.promise)
+ */
+PhotoSphereViewer.prototype._transition = function(texture, position) {
+  var self = this;
+
+  // create a new sphere with the new texture
   var geometry = new THREE.SphereGeometry(190, 32, 32, -PhotoSphereViewer.HalfPI);
 
   var material = new THREE.MeshBasicMaterial();
@@ -630,23 +674,66 @@ PhotoSphereViewer.prototype._blendTexture = function(texture) {
   var mesh = new THREE.Mesh(geometry, material);
   mesh.scale.x = -1;
 
+  if (position) { // FIXME
+    mesh.rotateY(this.prop.longitude - position.longitude);
+    mesh.rotateX(this.prop.latitude - position.latitude);
+  }
+
   this.scene.add(mesh);
   this.render();
 
-  var self = this;
+  // animation with blur/zoom ?
+  if (this.config.transition.blur) {
+    this.passes.copy.enabled = false;
+    this.passes.blur.enabled = true;
+
+    var original_zoom_lvl = this.prop.zoom_lvl;
+  }
+
+  var onTick = function(properties) {
+    material.opacity = properties.opacity;
+
+    if (self.config.transition.blur) {
+      self.passes.blur.uniforms.fDensity.value = properties.density;
+      self._setZoom(properties.zoom);
+    }
+
+    //self.hud.container.style.opacity = properties.opacity;
+
+    self.render();
+  };
 
   return PSVUtils.animation({
-      properties: {
-        opacity: { start: 0.0, end: 1.0 }
-      },
-      duration: this.config.transition.duration / 2,
-      easing: 'easeInOutQuad',
-      onTick: function(properties) {
-        material.opacity = properties.opacity;
-        self.render();
-      }
+    properties: {
+      density: { start: 0.0, end: 1.5 },
+      opacity: { start: 0.0, end: 0.5 },
+      zoom: { start: original_zoom_lvl, end: 100 }
+    },
+    delay: 1,
+    duration: self.config.transition.duration / (self.config.transition.blur ? 4 / 3 : 2),
+    easing: self.config.transition.blur ? 'easeOutCubic' : 'linear',
+    onTick: onTick
+  })
+    .then(function() {
+      return PSVUtils.animation({
+        properties: {
+          density: { start: 1.5, end: 0.0 },
+          opacity: { start: 0.5, end: 1.0 },
+          zoom: { start: 100, end: original_zoom_lvl }
+        },
+        duration: self.config.transition.duration / (self.config.transition.blur ? 4 : 2),
+        easing: self.config.transition.blur ? 'easeInCubic' : 'linear',
+        onTick: onTick
+      });
     })
     .then(function() {
+      if (self.config.transition.blur) {
+        self.passes.copy.enabled = true;
+        self.passes.blur.enabled = false;
+
+        self._setZoom(original_zoom_lvl);
+      }
+
       self.mesh.material.map.dispose();
       self.mesh.material.map = texture;
 
@@ -656,63 +743,10 @@ PhotoSphereViewer.prototype._blendTexture = function(texture) {
       mesh.geometry = null;
       mesh.material.dispose();
       mesh.material = null;
-      mesh.dispose();
 
-      self.render();
-
-      return D.resolved();
-    });
-};
-
-PhotoSphereViewer.prototype._transition = function() {
-  var self = this;
-
-  this.passes.copy.enabled = false;
-  this.passes.blur.enabled = true;
-  this.prop.original_zoom_lvl = this.prop.zoom_lvl;
-
-  return PSVUtils.animation({
-      properties: {
-        fDensity: { start: 0.0, end: 1.0 },
-        opacity: { start: 1.0, end: 0.0 },
-        zoom: { start: this.prop.zoom_lvl, end: 100 }
-      },
-      duration: this.config.transition.duration / 2,
-      easing: 'easeOutCubic',
-      onTick: function(properties) {
-        self.passes.blur.uniforms.fDensity.value = properties.fDensity;
-        self.hud.container.style.opacity = properties.opacity;
-
-        self._setZoom(properties.zoom);
-        self.render();
+      if (position) {
+        self.rotate(position.longitude, position.latitude);
       }
-    })
-    .then(function() {
-      return PSVUtils.animation({
-        properties: {
-          fDensity: { start: 1.0, end: 0.0 },
-          opacity: { start: 0.0, end: 1.0 },
-          zoom: { start: 100, end: self.prop.original_zoom_lvl }
-        },
-        duration: self.config.transition.duration / 4,
-        easing: 'easeInCubic',
-        onTick: function(properties) {
-          self.passes.blur.uniforms.fDensity.value = properties.fDensity;
-          self.hud.container.style.opacity = properties.opacity;
-
-          self._setZoom(properties.zoom);
-          self.render();
-        }
-      });
-    })
-    .then(function() {
-      self.passes.copy.enabled = true;
-      self.passes.blur.enabled = false;
-      delete self.prop.original_zoom_lvl;
-
-      self.render();
-
-      return D.resolved();
     });
 };
 
@@ -728,8 +762,8 @@ PhotoSphereViewer.prototype.render = function() {
   );
 
   this.camera.lookAt(this.prop.direction);
-  this.renderer.render(this.scene, this.camera);
 
+  this.renderer.render(this.scene, this.camera);
   this.trigger('render');
 };
 

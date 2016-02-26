@@ -30,6 +30,7 @@
 
 <script src="../bower_components/three.js/three.js"></script>
 <script src="../bower_components/D.js/lib/D.min.js"></script>
+<script src="../bower_components/requestanimationframe/index.js"></script>
 <script src="../bower_components/threejs-examples/examples/js/renderers/CanvasRenderer.js"></script>
 <script src="../bower_components/threejs-examples/examples/js/renderers/Projector.js"></script>
 <script src="../bower_components/threejs-examples/examples/js/postprocessing/EffectComposer.js"></script>
@@ -93,13 +94,24 @@
         title: 'Custom action',
         className: 'custom-button',
         content: '★',
-        onClick: function() {
-          Object.keys(PSV.hud.markers).forEach(function(marker) {
-            PSV.removeMarker(marker);
-          });
-          PSV.setCaption('Bryce Canyon National Park <b>&copy; Jess Beauchemin</b>');
-          PSV.setPanorama('Bryce-Canyon-By-Jess-Beauchemin.jpg', true);
-        }
+        onClick: (function() {
+          var i = false;
+
+          return function() {
+            i = !i;
+            Object.keys(PSV.hud.markers).forEach(function(marker) {
+              PSV.removeMarker(marker);
+            });
+
+            PSV.setPanorama(i ? 'Bryce-Canyon-By-Jess-Beauchemin.jpg' : 'Bryce-Canyon-National-Park-Mark-Doliner.jpg', {
+              longitude: i ? 3.7153696451829257 : 3.8484510006474992,
+              latitude: i ? 0.57417649320975916 : -0.24434609527920628
+            }, true)
+              .then(function() {
+                PSV.setCaption('Bryce Canyon National Park <b>&copy; Jess Beauchemin</b>');
+              });
+          }
+        }())
       },
       'caption',
       'fullscreen'
@@ -111,11 +123,11 @@
     default_fov: 70,
     time_anim: false,
     transition: {
-      duration: 5000,
+      duration: 1000,
       loader: true,
       blur: true
     },
-    visit: [[3.861, 0.034], [5.157,0.340], [0.479,0.654], [1.893,0.270]],
+    visit: [[3.861, 0.034], [5.157,0.340], [0.479,0.654], [1.893,0.270]]/*,
     markers: (function(){
       var a = [];
       for (var i=0; i<Math.PI*2; i+=Math.PI/4) {
@@ -199,7 +211,7 @@
       });
 
       return a;
-    }())
+    }())*/
   });
 
   PSV.on('click', function(e) {
