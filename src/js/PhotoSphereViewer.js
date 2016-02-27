@@ -683,11 +683,10 @@ PhotoSphereViewer.prototype._transition = function(texture, position) {
   this.render();
 
   // animation with blur/zoom ?
+  var original_zoom_lvl = this.prop.zoom_lvl;
   if (this.config.transition.blur) {
     this.passes.copy.enabled = false;
     this.passes.blur.enabled = true;
-
-    var original_zoom_lvl = this.prop.zoom_lvl;
   }
 
   var onTick = function(properties) {
@@ -698,7 +697,7 @@ PhotoSphereViewer.prototype._transition = function(texture, position) {
       self._setZoom(properties.zoom);
     }
 
-    //self.hud.container.style.opacity = properties.opacity;
+    // self.hud.container.style.opacity = properties.opacity;
 
     self.render();
   };
@@ -711,7 +710,7 @@ PhotoSphereViewer.prototype._transition = function(texture, position) {
     },
     delay: 1,
     duration: self.config.transition.duration / (self.config.transition.blur ? 4 / 3 : 2),
-    easing: self.config.transition.blur ? 'easeOutCubic' : 'linear',
+    easing: self.config.transition.blur ? 'outCubic' : 'linear',
     onTick: onTick
   })
     .then(function() {
@@ -722,7 +721,7 @@ PhotoSphereViewer.prototype._transition = function(texture, position) {
           zoom: { start: 100, end: original_zoom_lvl }
         },
         duration: self.config.transition.duration / (self.config.transition.blur ? 4 : 2),
-        easing: self.config.transition.blur ? 'easeInCubic' : 'linear',
+        easing: self.config.transition.blur ? 'inCubic' : 'linear',
         onTick: onTick
       });
     })

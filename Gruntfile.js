@@ -6,27 +6,13 @@ module.exports = function(grunt) {
 
   grunt.util.linefeed = '\n';
 
-  var files_in_order = [
+  // some classes have to be executed before other
+  var files_in_order = grunt.file.expand([
     'src/js/PhotoSphereViewer.js',
     'src/js/PSVComponent.js',
-    'src/js/PSVLoader.js',
-    'src/js/PSVHUD.js',
-    'src/js/PSVPanel.js',
-    'src/js/PSVTooltip.js',
-    'src/js/PSVNavBar.js',
-    'src/js/PSVNavBarCaption.js',
-    'src/js/PSVNavBarSpacer.js',
     'src/js/PSVNavBarButton.js',
-    'src/js/PSVNavBarAutorotateButton.js',
-    'src/js/PSVNavBarFullscreenButton.js',
-    'src/js/PSVNavBarZoomButton.js',
-    'src/js/PSVNavBarDownloadButton.js',
-    'src/js/PSVNavBarMarkersButton.js',
-    'src/js/PSVNavBarCustomButton.js',
-    'src/js/PSVError.js',
-    'src/js/PSVUtils.js'
-  ];
-
+    'src/js/*.js'
+  ]);
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
@@ -40,6 +26,9 @@ module.exports = function(grunt) {
       ' */',
 
     concat: {
+      /**
+       * Concatenate src JS + SVG files to dist
+       */
       js: {
         options: {
           stripBanners: false,
@@ -57,6 +46,9 @@ module.exports = function(grunt) {
         src: files_in_order.concat(['src/icons/*.svg']),
         dest: 'dist/photo-sphere-viewer.js'
       },
+      /**
+       * Add banner to generated CSS files
+       */
       css: {
         options: {
           banner: '<%= banner %>\n\n'
@@ -69,6 +61,9 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * Add AMD wrapper and banner to dist JS file
+     */
     wrap: {
       dist: {
         src: 'dist/photo-sphere-viewer.js',
@@ -85,6 +80,9 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * Minify dist JS file
+     */
     uglify: {
       options: {
         banner: '<%= banner %>\n\n'
@@ -95,17 +93,23 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * Generate dist CSS from src SCSS
+     */
     sass: {
       options: {
         sourcemap: 'none',
         style: 'expanded'
       },
-      dist: {
+      lib: {
         src: 'src/scss/photo-sphere-viewer.scss',
         dest: 'dist/photo-sphere-viewer.css'
       }
     },
 
+    /**
+     * Minify dist CSS file
+     */
     cssmin: {
       dist: {
         src: 'dist/photo-sphere-viewer.css',
@@ -113,11 +117,14 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * JSHint tests on src files
+     */
     jshint: {
       options: {
         jshintrc: '.jshintrc'
       },
-      dist: {
+      lib: {
         src: ['src/js/*.js']
       },
       grunt: {
@@ -125,23 +132,37 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * JSCS test on src files
+     */
     jscs: {
+      options: {
+        config: '.jscsrc'
+      },
       lib: {
-        options: {
-          config: '.jscsrc'
-        },
         src: ['src/js/*.js']
+      },
+      grunt: {
+        src: ['Gruntfile.js']
       }
     },
 
+    /**
+     * SCSSLint test on src files
+     */
     scsslint: {
-      allFiles: ['src/scss/*.scss'],
       options: {
         colorizeOutput: true,
         config: '.scss-lint.yml'
+      },
+      lib: {
+        src: ['src/scss/*.scss']
       }
     },
 
+    /**
+     * Serve des content on localhost:9000
+     */
     connect: {
       dev: {
         options: {
@@ -151,6 +172,9 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * Rebuild lib and refresh server on files change
+     */
     watch: {
       src: {
         files: ['src/**'],
@@ -168,6 +192,9 @@ module.exports = function(grunt) {
       }
     },
 
+    /**
+     * Open the example page on the server
+     */
     open: {
       dev: {
         path: 'http://localhost:<%= connect.dev.options.port%>/example/index.htm'
@@ -175,6 +202,9 @@ module.exports = function(grunt) {
     }
   });
 
+  /**
+   * Build the lib
+   */
   grunt.registerTask('default', [
     'concat:js',
     'wrap',
@@ -184,12 +214,18 @@ module.exports = function(grunt) {
     'concat:css'
   ]);
 
+  /**
+   * Run tests
+   */
   grunt.registerTask('test', [
     'jshint',
     'jscs',
     'scsslint'
   ]);
 
+  /**
+   * Development server
+   */
   grunt.registerTask('serve', [
     'default',
     'open',

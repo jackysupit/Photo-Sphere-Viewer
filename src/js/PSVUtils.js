@@ -226,9 +226,10 @@ PSVUtils.animation = function(options) {
 
     var progress = (timestamp - start) / options.duration;
     var current = {};
+    var name;
 
     if (progress < 1.0) {
-      for (var name in options.properties) {
+      for (name in options.properties) {
         current[name] = options.properties[name].start + (options.properties[name].end - options.properties[name].start) * options.easing(progress);
       }
 
@@ -237,7 +238,7 @@ PSVUtils.animation = function(options) {
       window.requestAnimationFrame(run);
     }
     else {
-      for (var name in options.properties) {
+      for (name in options.properties) {
         current[name] = options.properties[name].end;
       }
 
@@ -259,35 +260,69 @@ PSVUtils.animation = function(options) {
   return defer.promise;
 };
 
-// https://gist.github.com/gre/1650294
+/**
+ * Collection fo easing functions
+ * https://gist.github.com/frederickk/6165768
+ */
+// @formatter:off
+// jscs:disable
+/* jshint ignore:start */
 PSVUtils.animation.easings = {
   // no easing, no acceleration
-  linear: function (t) { return t },
+  linear: function(t) { return t; },
+
   // accelerating from zero velocity
-  easeInQuad: function (t) { return t*t },
+  inQuad: function(t) { return t*t; },
   // decelerating to zero velocity
-  easeOutQuad: function (t) { return t*(2-t) },
+  outQuad: function(t) { return t*(2-t); },
   // acceleration until halfway, then deceleration
-  easeInOutQuad: function (t) { return t<.5 ? 2*t*t : -1+(4-2*t)*t },
+  inOutQuad: function(t) { return t<.5 ? 2*t*t : -1+(4-2*t)*t; },
+
   // accelerating from zero velocity
-  easeInCubic: function (t) { return t*t*t },
+  inCubic: function(t) { return t*t*t; },
   // decelerating to zero velocity
-  easeOutCubic: function (t) { return (--t)*t*t+1 },
+  outCubic: function(t) { return (--t)*t*t+1; },
   // acceleration until halfway, then deceleration
-  easeInOutCubic: function (t) { return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1 },
+  inOutCubic: function(t) { return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1; },
+
   // accelerating from zero velocity
-  easeInQuart: function (t) { return t*t*t*t },
+  inQuart: function(t) { return t*t*t*t; },
   // decelerating to zero velocity
-  easeOutQuart: function (t) { return 1-(--t)*t*t*t },
+  outQuart: function(t) { return 1-(--t)*t*t*t; },
   // acceleration until halfway, then deceleration
-  easeInOutQuart: function (t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t },
+  inOutQuart: function(t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t; },
+
   // accelerating from zero velocity
-  easeInQuint: function (t) { return t*t*t*t*t },
+  inQuint: function(t) { return t*t*t*t*t; },
   // decelerating to zero velocity
-  easeOutQuint: function (t) { return 1+(--t)*t*t*t*t },
+  outQuint: function(t) { return 1+(--t)*t*t*t*t; },
   // acceleration until halfway, then deceleration
-  easeInOutQuint: function (t) { return t<.5 ? 16*t*t*t*t*t : 1+16*(--t)*t*t*t*t }
+  inOutQuint: function(t) { return t<.5 ? 16*t*t*t*t*t : 1+16*(--t)*t*t*t*t; },
+
+  // accelerating from zero velocity
+  inSine: function(t) { return 1-Math.cos(t*(Math.PI/2)); },
+  // decelerating to zero velocity
+  outSine: function(t) { return Math.sin(t*(Math.PI/2)); },
+  // accelerating until halfway, then decelerating
+  inOutSine: function(t) { return .5-.5*Math.cos(Math.PI*t); },
+
+  // accelerating from zero velocity
+  inExpo: function(t) { return Math.pow(2, 10*(t-1)); },
+  // decelerating to zero velocity
+  outExpo: function(t) { return 1-Math.pow(2, -10*t); },
+  // accelerating until halfway, then decelerating
+  inOutExpo: function(t) { t=t*2-1; return t<0 ? .5*Math.pow(2, 10*t) : 1-.5*Math.pow(2, -10*t); },
+
+  // accelerating from zero velocity
+  inCirc: function(t) { return 1-Math.sqrt(1-t*t); },
+  // decelerating to zero velocity
+  outCirc: function(t) { t--; return Math.sqrt(1-t*t); },
+  // acceleration until halfway, then deceleration
+  inOutCirc: function(t) { t*=2; return t<1 ? .5-.5*Math.sqrt(1-t*t) : .5+.5*Math.sqrt(1-(t-=2)*t); }
 };
+// jscs:enable
+/* jshint ignore:end */
+// @formatter:off
 
 /**
  * Merge the enumerable attributes of two objects.
