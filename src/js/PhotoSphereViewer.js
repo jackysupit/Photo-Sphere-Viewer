@@ -674,9 +674,14 @@ PhotoSphereViewer.prototype._transition = function(texture, position) {
   var mesh = new THREE.Mesh(geometry, material);
   mesh.scale.x = -1;
 
-  if (position) { // FIXME
-    mesh.rotateY(this.prop.longitude - position.longitude);
-    mesh.rotateX(this.prop.latitude - position.latitude);
+  if (position) {
+    // Longitude rotation along the vertical axis
+    mesh.rotateY(position.longitude - this.prop.longitude);
+
+    // Latitude rotation along the camera horizontal axis
+    var axis = new THREE.Vector3(0, 1, 0).cross(this.camera.getWorldDirection()).normalize();
+    var q = new THREE.Quaternion().setFromAxisAngle(axis, position.latitude - this.prop.latitude);
+    mesh.quaternion.multiplyQuaternions(q, mesh.quaternion);
   }
 
   this.scene.add(mesh);
